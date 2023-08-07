@@ -4,36 +4,31 @@ const jwt = require('jsonwebtoken');
 const secret = 'mysecretsshhhhh';
 const expiration = '2h';
 
-module.exports = {
-  // function for our authenticated routes
-  authMiddleware: function (req, res, next) {
-    // allows token to be sent via  req.query or headers
-    let token = req.query.token || req.headers.authorization;
+// Update the authMiddleware function to work with the GraphQL API
+function authMiddleware({ req }) {
+  // allows token to be sent via req.headers.authorization
+  let token = req.headers.authorization || '';
 
-    // ["Bearer", "<tokenvalue>"]
-    if (req.headers.authorization) {
-      token = token.split(' ').pop().trim();
-    }
+  if (token.startsWith('Bearer ')) {
+    // Remove 'Bearer ' from the token string
+    token = token.slice(7, token.length).trim();
+  }
 
-    if (!token) {
-      return res.status(400).json({ message: 'You have no token!' });
-    }
+  if (!token) {
+    // If no token is provided, set user to null in the context
+    return { user: null };
+  }
 
-    // verify token and get user data out of it
-    try {
-      const { data } = jwt.verify(token, secret, { maxAge: expiration });
-      req.user = data;
-    } catch {
-      console.log('Invalid token');
-      return res.status(400).json({ message: 'invalid token!' });
-    }
+  try {
+    // Verify token and get user data out of it
+    const { data } = jwt.verify(token, secret, { maxAge: expiration });
+    // Set the user data in the context object
+    return { user: data };
+  } catch (err) {
+    console.log('Invalid token', err);
+    // If token verification fails, set user to null in the context
+    return { user: null };
+  }
+}
 
-    // send to next endpoint
-    next();
-  },
-  signToken: function ({ username, email, _id }) {
-    const payload = { username, email, _id };
-
-    return jwt.sign({ data: payload }, secret, { expiresIn: expiration });
-  },
-};
+module.exports = { authMiddleware };
